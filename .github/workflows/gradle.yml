@@ -66,11 +66,26 @@ jobs:
       - name: Clone oms-demo-api
         run: git clone https://x-access-token:${{ secrets.GH_PACKAGES_READ_TOKEN }}@github.com/at-boundary/oms-demo-api.git oms-demo-api
 
+      - name: Start oms-demo-api with Docker Compose
+        working-directory: oms-demo-api
+        run: docker compose up --build -d
+
+      - name: Wait for oms-demo-api to be healthy
+        run: |
+          for i in $(seq 1 30); do
+            if curl -sf http://localhost:8000/health; then
+              echo "API is up"
+              exit 0
+            fi
+            echo "Waiting... ($i/30)"
+            sleep 3
+          done
+          echo "API did not start in time"
+          docker compose -f oms-demo-api/docker-compose.yml logs
+          exit 1
+
       - name: Run End-to-End Tests
         env:
           GPR_USER: ${{ github.actor }}
           GPR_TOKEN: ${{ secrets.GH_PACKAGES_READ_TOKEN }}
-        working-directory: oms-demo-api
-        run: |
-          chmod +x gradlew
-          ./gradlew clean test --tests "demoapi.*" --info -DrunWithMetatest=true
+        run: ./gradlew clean test --tests "demoapi.*" --info -DrunWithMetatest=true
